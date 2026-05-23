@@ -19,7 +19,7 @@ pipeline {
             steps {
                 sh '''
                 docker run --rm \
-                -v $PWD:/app \
+                -v "$(pwd)":/app
                 -w /app \
                 maven:3.9.6-eclipse-temurin-17 \
                 mvn clean verify sonar:sonar
