@@ -15,13 +15,15 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('SonarQube Analysis (Maven in Docker)') {
             steps {
-                withSonarQubeEnv('sonar') {
-                    sh '''
-                        mvn clean verify sonar:sonar
-                    '''
-                }
+                sh '''
+                    docker run --rm \
+                    -v $PWD:/app \
+                    -w /app \
+                    maven:3.9.6-eclipse-temurin-17 \
+                    mvn clean verify sonar:sonar
+                '''
             }
         }
 
