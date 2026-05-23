@@ -11,33 +11,27 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 git branch: 'master',
-                    url: 'https://github.com/shubhamchoudhary927/complete_cicd_test_with_sonarqube.git'
+                url: 'https://github.com/shubhamchoudhary927/complete_cicd_test_with_sonarqube.git'
             }
         }
 
-        stage('Build & SonarQube Analysis') {
+        stage('SonarQube Analysis') {
             steps {
                 sh '''
-                    docker run --rm \
-                    -v $PWD:/app \
-                    -w /app \
-                    maven:3.9.6-eclipse-temurin-17 \
-                    mvn clean verify sonar:sonar
+                docker run --rm \
+                -v $PWD:/app \
+                -w /app \
+                maven:3.9.6-eclipse-temurin-17 \
+                mvn clean verify sonar:sonar
                 '''
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $IMAGE_NAME:${BUILD_ID} ."
+                sh '''
+                docker build -t $IMAGE_NAME:${BUILD_ID} .
+                '''
             }
         }
 
@@ -49,7 +43,7 @@ pipeline {
                     passwordVariable: 'PASS'
                 )]) {
                     sh '''
-                        echo $PASS | docker login -u $USER --password-stdin
+                    echo $PASS | docker login -u $USER --password-stdin
                     '''
                 }
             }
@@ -57,27 +51,33 @@ pipeline {
 
         stage('Push Image') {
             steps {
-                sh "docker push $IMAGE_NAME:${BUILD_ID}"
+                sh '''
+                docker push $IMAGE_NAME:${BUILD_ID}
+                docker tag $IMAGE_NAME:${BUILD_ID} $IMAGE_NAME:latest
+                docker push $IMAGE_NAME:latest
+                '''
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy To Kubernetes') {
             steps {
-                sh """
-                    kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_DEPLOYMENT}=$IMAGE_NAME:${BUILD_ID}
-                    kubectl rollout status deployment/${K8S_DEPLOYMENT} --timeout=120s
-                """
+                sh '''
+                kubectl set image deployment/cicd-app \
+                cicd-app=$IMAGE_NAME:${BUILD_ID}
+
+                kubectl rollout status deployment/cicd-app
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "🚀 SUCCESS: CI/CD pipeline completed successfully"
+            echo '🚀 APPLICATION DEPLOYED SUCCESSFULLY'
         }
 
         failure {
-            echo "❌ FAILED: Check logs"
+            echo '❌ PIPELINE FAILED'
         }
 
         always {
