@@ -19,7 +19,7 @@ pipeline {
             steps {
                 sh '''
                 docker run --rm \
-                -v "$(pwd)":/app
+                -v "$WORKSPACE:/app" \
                 -w /app \
                 maven:3.9.6-eclipse-temurin-17 \
                 mvn clean verify sonar:sonar
@@ -29,9 +29,7 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                docker build -t $IMAGE_NAME:${BUILD_ID} .
-                '''
+                sh "docker build -t $IMAGE_NAME:${BUILD_ID} ."
             }
         }
 
@@ -42,8 +40,9 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
+
                     sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
+                    echo "$PASS" | docker login -u "$USER" --password-stdin
                     '''
                 }
             }
@@ -51,29 +50,25 @@ pipeline {
 
         stage('Push Image') {
             steps {
-                sh '''
-                docker push $IMAGE_NAME:${BUILD_ID}
-                docker tag $IMAGE_NAME:${BUILD_ID} $IMAGE_NAME:latest
-                docker push $IMAGE_NAME:latest
-                '''
+                sh "docker push $IMAGE_NAME:${BUILD_ID}"
             }
         }
 
         stage('Deploy To Kubernetes') {
             steps {
-                sh '''
-                kubectl set image deployment/cicd-app \
-                cicd-app=$IMAGE_NAME:${BUILD_ID}
+                sh """
+                kubectl set image deployment/${K8S_DEPLOYMENT} \
+                ${K8S_DEPLOYMENT}=$IMAGE_NAME:${BUILD_ID}
 
-                kubectl rollout status deployment/cicd-app
-                '''
+                kubectl rollout status deployment/${K8S_DEPLOYMENT}
+                """
             }
         }
     }
 
     post {
         success {
-            echo '🚀 APPLICATION DEPLOYED SUCCESSFULLY'
+            echo '🚀 PIPELINE SUCCESS'
         }
 
         failure {
