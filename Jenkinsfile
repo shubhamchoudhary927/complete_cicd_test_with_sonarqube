@@ -15,7 +15,7 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis (Maven in Docker)') {
+        stage('Build & SonarQube Analysis') {
             steps {
                 sh '''
                     docker run --rm \
