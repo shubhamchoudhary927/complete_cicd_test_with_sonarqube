@@ -1,15 +1,28 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'maven:3.9.6-eclipse-temurin-17'
+            args '-v /root/.m2:/root/.m2'
+        }
+    }
 
     environment {
         IMAGE_NAME = "shubham6261/cicd-app"
+        DOCKER_CREDENTIALS = "dockerhub-creds"
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/shubhamchoudhary927/complete_cicd_test_with_sonarqube.git'
+                git branch: 'master',
+                    url: 'https://github.com/shubhamchoudhary927/complete_cicd_test_with_sonarqube.git'
+            }
+        }
+
+        stage('Build & Test') {
+            steps {
+                sh 'mvn clean compile'
             }
         }
 
@@ -17,9 +30,16 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar') {
                     sh '''
-                        echo "Running SonarQube Scan..."
                         mvn clean verify sonar:sonar
                     '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -30,9 +50,13 @@ pipeline {
             }
         }
 
-        stage('Login to DockerHub') {
+        stage('Docker Login') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
                     sh '''
                         echo $PASS | docker login -u $USER --password-stdin
                     '''
@@ -50,7 +74,7 @@ pipeline {
             steps {
                 sh '''
                     kubectl set image deployment/cicd-app cicd-app=$IMAGE_NAME:${BUILD_ID}
-                    kubectl rollout status deployment/cicd-app
+                    kubectl rollout status deployment/cicd-app --timeout=120s
                 '''
             }
         }
@@ -58,10 +82,15 @@ pipeline {
 
     post {
         success {
-            echo "🚀 CI/CD SUCCESS - APP DEPLOYED"
+            echo "🚀 SUCCESS: CI/CD pipeline completed"
         }
+
         failure {
-            echo "❌ PIPELINE FAILED"
+            echo "❌ FAILED: Check logs"
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
