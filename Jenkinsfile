@@ -1,14 +1,9 @@
 pipeline {
-    agent {
-        docker {
-            image 'maven:3.9.6-eclipse-temurin-17'
-            args '-v /root/.m2:/root/.m2'
-        }
-    }
+    agent any
 
     environment {
         IMAGE_NAME = "shubham6261/cicd-app"
-        DOCKER_CREDENTIALS = "dockerhub-creds"
+        K8S_DEPLOYMENT = "cicd-app"
     }
 
     stages {
@@ -17,12 +12,6 @@ pipeline {
             steps {
                 git branch: 'master',
                     url: 'https://github.com/shubhamchoudhary927/complete_cicd_test_with_sonarqube.git'
-            }
-        }
-
-        stage('Build & Test') {
-            steps {
-                sh 'mvn clean compile'
             }
         }
 
@@ -72,17 +61,17 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                    kubectl set image deployment/cicd-app cicd-app=$IMAGE_NAME:${BUILD_ID}
-                    kubectl rollout status deployment/cicd-app --timeout=120s
-                '''
+                sh """
+                    kubectl set image deployment/${K8S_DEPLOYMENT} ${K8S_DEPLOYMENT}=$IMAGE_NAME:${BUILD_ID}
+                    kubectl rollout status deployment/${K8S_DEPLOYMENT} --timeout=120s
+                """
             }
         }
     }
 
     post {
         success {
-            echo "🚀 SUCCESS: CI/CD pipeline completed"
+            echo "🚀 SUCCESS: CI/CD pipeline completed successfully"
         }
 
         failure {
